@@ -177,7 +177,7 @@ a.btn.kofi:not(.sm){background:#FF5E5B;border-color:#FF5E5B;color:#fff;font-weig
       <h1>Carnet <span>Muscu</span></h1>
       <p class="sub" id="headSub">Charges en kg · DB = poids d'un haltère · 0 kg = poids du corps</p>
     </div>
-    <div class="row"><button class="btn solid sm" id="goInstall">Installer sur mon téléphone</button><a class="btn sm kofi" id="kofiBtn" href="https://ko-fi.com/carnetdemuscu#galleryItemView" target="_blank" rel="noopener" title="Soutenir sur Ko-fi">☕ Ko-fi</a><button class="btn sm" id="langBtn" type="button">EN</button><span class="label" id="storeState">…</span></div>
+    <div class="row"><button class="btn solid sm" id="goInstall">Installer sur mon téléphone</button><a class="btn sm kofi" id="kofiBtn" href="https://ko-fi.com/carnetdemuscu#galleryItemView" target="_blank" rel="noopener" title="Soutenir sur Ko-fi">☕ Ko-fi</a><button class="btn sm" id="langBtn" type="button">🌐 English</button><span class="label" id="storeState">…</span></div>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -1179,7 +1179,7 @@ onData();
   const btn=document.getElementById("langBtn");
   function paint(){
     document.documentElement.lang=window.__lang;
-    if(btn){btn.textContent=window.__lang==="en"?"FR":"EN";btn.setAttribute("aria-label",window.__lang==="en"?"Passer en français":"Switch to English");}
+    if(btn){btn.textContent=window.__lang==="en"?"🌐 Français":"🌐 English";btn.setAttribute("aria-label",window.__lang==="en"?"Passer en français":"Switch to English");}
   }
   function setLang(l){
     window.__lang=l; try{localStorage.setItem(KEY,l)}catch(e){}
