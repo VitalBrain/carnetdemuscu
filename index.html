@@ -225,6 +225,7 @@ a.btn.kofi:not(.sm){background:#FF5E5B;border-color:#FF5E5B;color:#fff;font-weig
       <button class="btn" data-goto-tab="prog">Modifier le programme</button>
     </div>
     <div id="ageBanner"></div>
+    <div id="editBanner"></div>
     <div class="card last" id="lastBox"></div>
     <div class="sessmeta">
       <label><span class="label">Date</span><input type="date" id="sDate"></label>
@@ -603,7 +604,7 @@ function setsLine(e){
   const kg=w.length===1?(w[0]?`${fmtKg(w[0])} kg`:"PDC"):`${w.map(fmtKg).join("/")} kg`;
   return `${sets.length} × ${sets.map(s=>s.reps).join("/")} · ${kg}`;
 }
-function lastFor(exId){const s=sorted();for(let i=s.length-1;i>=0;i--){const e=s[i].exercises.find(x=>x.id===exId);if(e&&e.sets?.length)return{e,date:s[i].date}}return null}
+function lastFor(exId){const s=sorted().filter(x=>!(typeof draft!=="undefined"&&draft&&x.id===draft.editId));for(let i=s.length-1;i>=0;i--){const e=s[i].exercises.find(x=>x.id===exId);if(e&&e.sets?.length)return{e,date:s[i].date}}return null}
 const weeksSince=t=>Math.floor((Date.now()-(t||Date.now()))/604800000);
 
 /* ---------- picker (shared by program editor and one-off extra) ---------- */
@@ -723,9 +724,11 @@ $("saveBtn").addEventListener("click",async()=>{
     return sets.length?{id:it.exId,name:exName(it.exId),sets,feel:d.feel||null}:null;
   }).filter(Boolean);
   if(!exercises.length){toast("toast","Remplis au moins une série (les reps suffisent au poids du corps).",true);return}
-  const s={id:"s"+(draft.date||todayISO()).replace(/-/g,"")+"-"+Math.random().toString(36).slice(2,7),date:draft.date||todayISO(),note:draft.note||"",program:p.name,programId:p.id,exercises,savedAt:Date.now()};
+  const orig=draft.editId?sessions.find(x=>x.id===draft.editId):null;
+  const s={id:orig?orig.id:"s"+(draft.date||todayISO()).replace(/-/g,"")+"-"+Math.random().toString(36).slice(2,7),date:draft.date||todayISO(),note:draft.note||"",program:orig?(orig.program||p.name):p.name,programId:orig?(orig.programId||p.id):p.id,exercises,savedAt:orig?(orig.savedAt||Date.now()):Date.now()};
+  if(orig) s.editedAt=Date.now();
   $("saveBtn").disabled=true;
-  try{await backend.save(s);draft=freshDraft();saveDraft();$("sDate").value=draft.date;$("sNote").value="";toast("toast",`Séance enregistrée · ${exercises.length} exercices`);renderForm();window.scrollTo({top:0})}
+  try{await backend.save(s);const wasEdit=!!orig;draft=freshDraft();saveDraft();$("sDate").value=draft.date;$("sNote").value="";toast("toast",wasEdit?"Séance modifiée":`Séance enregistrée · ${exercises.length} exercices`);renderForm();renderEditBanner();window.scrollTo({top:0})}
   catch(err){toast("toast","Échec de l'enregistrement. Réessaie dans un instant.",true)}
   finally{$("saveBtn").disabled=false}
 });
@@ -736,6 +739,7 @@ function renderLast(){
   const s=sorted().pop();
   if(!s){$("lastBox").innerHTML=`<h2>Dernière séance</h2><p class="sub">Rien d'enregistré pour l'instant. Remplis les exercices ci-dessous puis « Enregistrer la séance ».</p>`;return}
   $("lastBox").innerHTML=`<div class="row between"><h2>Dernière séance</h2><span class="label">${fmtDate(s.date,true)}</span></div>
+  <div class="row" style="margin-top:6px"><button class="btn sm" data-editsess="${s.id}">Modifier</button><button class="btn sm ghost" style="color:var(--muted)" data-goto-hist>Supprimer…</button></div>
   <p class="sub">${esc(s.program||"")}${s.program&&s.note?" · ":""}${esc(s.note||"")}</p>
   <table>${s.exercises.map(e=>`<tr><td>${esc(e.name)}</td><td class="num">${esc(setsLine(e))}</td><td>${arrowChip(e.feel)}</td></tr>`).join("")}</table>`;
 }
@@ -818,16 +822,19 @@ function renderHist(){
   const s=sorted().reverse();
   if(!s.length){$("histList").innerHTML=`<div class="empty">Tes séances apparaîtront ici, de la plus récente à la plus ancienne.</div>`;return}
   $("histList").innerHTML=s.map((x,i)=>{
+    const isOpen=openHist.size?openHist.has(x.id):i===0;
     const vol=x.exercises.reduce((v,e)=>v+exStats(e).vol,0);
-    return `<details class="sess"${i===0?" open":""}><summary><div><div class="d">${fmtDate(x.date,true)}</div><div class="meta">${x.program?esc(x.program)+" · ":""}${x.exercises.length} exercices · volume <span class="num">${fmtKg(vol)}</span> kg</div></div><span class="label">▾</span></summary>
+    return `<details class="sess" data-sid="${x.id}"${isOpen?" open":""}><summary><div><div class="d">${fmtDate(x.date,true)}</div><div class="meta">${x.program?esc(x.program)+" · ":""}${x.exercises.length} exercices · volume <span class="num">${fmtKg(vol)}</span> kg</div></div><span class="label">▾</span></summary>
     <div class="body">${x.note?`<p class="sub">${esc(x.note)}</p>`:""}<table>${x.exercises.map(e=>`<tr><td>${esc(e.name)}</td><td class="r num">${esc(setsLine(e))}</td><td class="r" style="width:28px">${arrowChip(e.feel)}</td></tr>`).join("")}</table>
-    <div class="row" style="margin-top:10px;justify-content:flex-end">${pendingDel===x.id?`<span class="sub" style="margin:0">Supprimer cette séance ?</span><button class="btn sm" data-cancel>Annuler</button><button class="btn sm danger" data-confirm="${x.id}">Supprimer</button>`:`<button class="btn ghost" style="color:var(--muted)" data-askdel="${x.id}">Supprimer</button>`}</div></div></details>`}).join("");
+    <div class="row" style="margin-top:10px;justify-content:flex-end">${pendingDel===x.id?`<span class="sub" style="margin:0">Supprimer cette séance ?</span><button class="btn sm" data-cancel>Annuler</button><button class="btn sm danger" data-confirm="${x.id}">Supprimer</button>`:`<button class="btn sm" data-editsess="${x.id}">Modifier</button><button class="btn ghost" style="color:var(--muted)" data-askdel="${x.id}">Supprimer</button>`}</div></div></details>`}).join("");
 }
+const openHist=new Set();
+$("histList").addEventListener("toggle",e=>{const d=e.target;if(!d.dataset||!d.dataset.sid)return;if(!openHist.size){const first=$("histList").querySelector("details");if(first&&first!==d&&first.open)openHist.add(first.dataset.sid)}d.open?openHist.add(d.dataset.sid):openHist.delete(d.dataset.sid)},true);
 $("histList").addEventListener("click",async e=>{
   const b=e.target.closest("button");if(!b)return;
   if(b.dataset.askdel){pendingDel=b.dataset.askdel;renderHist()}
   else if(b.hasAttribute("data-cancel")){pendingDel=null;renderHist()}
-  else if(b.dataset.confirm){const id=b.dataset.confirm;pendingDel=null;try{await backend.remove(id)}catch(err){toast("toast2","Suppression impossible pour le moment.",true)}}
+  else if(b.dataset.confirm){const id=b.dataset.confirm;pendingDel=null;openHist.delete(id);if(draft.editId===id){draft=freshDraft();saveDraft();$("sDate").value=draft.date;$("sNote").value="";renderEditBanner()}try{await backend.remove(id);toast("toast2","Séance supprimée.")}catch(err){toast("toast2","Suppression impossible pour le moment.",true)}}
 });
 
 /* ---------- export / import ---------- */
@@ -942,7 +949,27 @@ function showTab(t){
 document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b)showTab(b.dataset.tab)});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-goto-tab]");if(b)showTab(b.dataset.gotoTab)});
 
-function onData(){renderProgSel();renderLast();renderForm();renderProgs();renderHist();renderChart();renderMini()}
+function editSession(id){
+  const s=sessions.find(x=>x.id===id); if(!s) return;
+  const inProg=new Set(activeProg().items.map(i=>i.exId));
+  draft={date:s.date,note:s.note||"",editId:s.id,ex:{},extras:[]};
+  s.exercises.forEach(e=>{draft.ex[e.id]={sets:(e.sets||[]).map(x=>({reps:String(x.reps),weight:String(x.weight)})),feel:e.feel||null};if(!inProg.has(e.id))draft.extras.push(e.id)});
+  saveDraft(); $("sDate").value=draft.date; $("sNote").value=draft.note;
+  showTab("log"); renderForm(); renderEditBanner();
+}
+function cancelEdit(){draft=freshDraft();saveDraft();$("sDate").value=draft.date;$("sNote").value="";renderForm();renderEditBanner();toast("toast","Modification annulée.")}
+function renderEditBanner(){
+  const on=!!(draft&&draft.editId);
+  $("editBanner").innerHTML=on?`<div class="banner"><span>Tu modifies la séance du ${fmtDate(draft.date,true)}.</span><button class="btn sm" id="cancelEdit">Annuler la modification</button></div>`:"";
+  $("saveBtn").textContent=on?"Enregistrer les modifications":"Enregistrer la séance";
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.editsess) editSession(b.dataset.editsess);
+  else if(b.id==="cancelEdit") cancelEdit();
+  else if(b.hasAttribute("data-goto-hist")){showTab("hist");const id=sorted().pop()?.id;if(id){openHist.add(id);pendingDel=id;renderHist()}}
+});
+function onData(){renderProgSel();renderLast();renderForm();renderEditBanner();renderProgs();renderHist();renderChart();renderMini()}
 onData();
 </script>
 
@@ -1153,7 +1180,7 @@ if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWor
   "Une fenêtre de téléchargement est déjà ouverte.":"A download window is already open.",
   "Ce fichier n'est pas une sauvegarde .json du carnet.":"This file isn't a .json backup from the log.",
   "Tes séances apparaîtront ici, de la plus récente à la plus ancienne.":"Your sessions will show up here, newest first.",
-  "Supprimer cette séance ?":"Delete this session?","Suppression impossible pour le moment.":"Can't delete right now.",
+  "Supprimer cette séance ?":"Delete this session?","Supprimer…":"Delete…","Séance modifiée":"Session updated","Séance supprimée.":"Session deleted.","Modification annulée.":"Editing cancelled.","Annuler la modification":"Cancel editing","Enregistrer les modifications":"Save changes","Suppression impossible pour le moment.":"Can't delete right now.",
   "volume":"volume","▾":"▾",
   /* charts */
   "Charge max":"Max weight","Volume":"Volume","Reps totales":"Total reps","Actuel":"Current","Record":"Best","Depuis le début":"Since start",
@@ -1285,6 +1312,7 @@ if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWor
 
   const t=s=>trText(s)??s;
   const RULES=[
+    [/^Tu modifies la séance du (.+)\.$/, (m,d)=>`You are editing the session from ${d}.`],
     [/^Dernière fois \((.+)\) :$/, (m,d)=>`Last time (${d}):`],
     [/^Séance enregistrée · (\d+) exercices$/, (m,n)=>`Session saved · ${n} exercises`],
     [/^(\d+) exercices$/, (m,n)=>`${n} exercises`],
