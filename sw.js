@@ -1,4 +1,4 @@
-const CACHE="carnet-muscu-v11";
+const CACHE="carnet-muscu-v12";
 const SHELL=["./","index.html","manifest.webmanifest","icon-192.png","icon-512.png","icon-180.png"];
 const CACHED_HOSTS=["www.gstatic.com","fonts.googleapis.com","fonts.gstatic.com"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});

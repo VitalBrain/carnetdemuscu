@@ -148,6 +148,9 @@ a.btn.kofi:not(.sm){background:#FF5E5B;border-color:#FF5E5B;color:#fff;font-weig
 .ex.flash{box-shadow:0 0 0 3px var(--accent);transition:box-shadow .3s}
 td.exact{white-space:nowrap;width:1%;padding-left:6px}
 td.exact .x{font-size:1rem;padding:2px 5px}
+.rest{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rest-in{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
+.rest-in input{width:58px}
 /* history */
 .sess{background:var(--surface);border:1px solid var(--line);border-radius:10px}
 .sess summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -306,6 +309,7 @@ td.exact .x{font-size:1rem;padding:2px 5px}
         <button data-m="max" aria-pressed="true">Charge max</button>
         <button data-m="vol" aria-pressed="false">Volume</button>
         <button data-m="reps" aria-pressed="false">Reps totales</button>
+        <button data-m="rest" aria-pressed="false">Repos</button>
       </div>
       <div class="chart" id="chart"></div>
       <div class="legend">
@@ -600,12 +604,15 @@ setStoreLabel();
 
 /* ---------- derived ---------- */
 const sorted=()=>sessions.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.savedAt||0)-(b.savedAt||0));
-function exStats(e){const sets=e.sets||[];return{max:sets.reduce((m,s)=>Math.max(m,+s.weight||0),0),vol:sets.reduce((v,s)=>v+(+s.reps||0)*(+s.weight||0),0),reps:sets.reduce((v,s)=>v+(+s.reps||0),0)}}
+function exStats(e){const sets=e.sets||[];return{rest:e.rest||null,max:sets.reduce((m,s)=>Math.max(m,+s.weight||0),0),vol:sets.reduce((v,s)=>v+(+s.reps||0)*(+s.weight||0),0),reps:sets.reduce((v,s)=>v+(+s.reps||0),0)}}
+const mmss=sec=>{sec=Math.round(+sec||0);const m=Math.floor(sec/60),r=sec%60;return m+":"+String(r).padStart(2,"0")};
+const restOf=d=>{const m=d&&d.restM!==undefined&&d.restM!==""?+d.restM:0, s=d&&d.restS!==undefined&&d.restS!==""?+d.restS:0; const t=(m||0)*60+(s||0); return t>0?t:null};
+const restParts=sec=>sec?{restM:String(Math.floor(sec/60)),restS:String(Math.round(sec%60))}:{restM:"",restS:""};
 function setsLine(e){
   const sets=e.sets||[]; if(!sets.length) return "";
   const w=[...new Set(sets.map(s=>+s.weight||0))];
   const kg=w.length===1?(w[0]?`${fmtKg(w[0])} kg`:"PDC"):`${w.map(fmtKg).join("/")} kg`;
-  return `${sets.length} × ${sets.map(s=>s.reps).join("/")} · ${kg}`;
+  return `${sets.length} × ${sets.map(s=>s.reps).join("/")} · ${kg}${e.rest?` · ⏱ ${mmss(e.rest)}`:""}`;
 }
 function lastFor(exId){const s=sorted().filter(x=>!(typeof draft!=="undefined"&&draft&&x.id===draft.editId));for(let i=s.length-1;i>=0;i--){const e=s[i].exercises.find(x=>x.id===exId);if(e&&e.sets?.length)return{e,date:s[i].date}}return null}
 const weeksSince=t=>Math.floor((Date.now()-(t||Date.now()))/604800000);
@@ -657,7 +664,7 @@ function shownItems(){
   draft.extras.forEach(id=>{if(!items.some(i=>i.exId===id))items.push({exId:id,sets:3,reps:"",extra:true})});
   return items;
 }
-function ensureDraft(it){if(!draft.ex[it.exId])draft.ex[it.exId]={sets:Array.from({length:it.sets||3},()=>({reps:"",weight:""})),feel:null};return draft.ex[it.exId]}
+function ensureDraft(it){if(!draft.ex[it.exId]){const pv=lastFor(it.exId);draft.ex[it.exId]={sets:Array.from({length:it.sets||3},()=>({reps:"",weight:""})),feel:null,...restParts(pv&&pv.e.rest)}}return draft.ex[it.exId]}
 
 function renderForm(){
   const items=shownItems();
@@ -677,6 +684,7 @@ function renderForm(){
       ${prevHtml}
       <div class="sets"><span></span><span class="h">Reps</span><span class="h">Kg</span><span></span>${rows}</div>
       <div class="row"><button class="btn ghost" data-add="${it.exId}">+ Ajouter une série</button></div>
+      <div class="rest"><span class="label">Repos entre séries</span><span class="rest-in"><input type="number" inputmode="numeric" min="0" max="15" step="1" id="rm-${it.exId}" data-ex="${it.exId}" data-f="restM" value="${esc(d.restM??"")}" placeholder="1" aria-label="${esc(name)} minutes de repos"><span>min</span><input type="number" inputmode="numeric" min="0" max="59" step="5" id="rs-${it.exId}" data-ex="${it.exId}" data-f="restS" value="${esc(d.restS??"")}" placeholder="30" aria-label="${esc(name)} secondes de repos"><span>s</span></span></div>
       <div class="feel" role="group" aria-label="Ressenti">${["up","flat","down"].map(f=>`<button class="${f}" data-feel="${f}" data-ex="${it.exId}" aria-pressed="${d.feel===f}">${arrowSvg(f)}${FEEL[f].label}</button>`).join("")}</div>
     </article>`;
   }).join("");
@@ -684,6 +692,7 @@ function renderForm(){
 }
 $("exList").addEventListener("input",e=>{
   const t=e.target; if(!t.dataset.f) return;
+  if(t.dataset.f==="restM"||t.dataset.f==="restS"){draft.ex[t.dataset.ex][t.dataset.f]=t.value;saveDraft();return}
   const sets=draft.ex[t.dataset.ex].sets, k=+t.dataset.k;
   sets[k][t.dataset.f]=t.value;
   if(t.dataset.f==="weight"){for(let j=k+1;j<sets.length;j++){if(sets[j].weight===""){sets[j].weight=t.value;const el=$(`w-${t.dataset.ex}-${j}`);if(el)el.value=t.value}}}
@@ -696,7 +705,7 @@ $("exList").addEventListener("click",e=>{
   if(b.dataset.feel){const d=draft.ex[b.dataset.ex];d.feel=d.feel===b.dataset.feel?null:b.dataset.feel;saveDraft();renderForm();return}
   if(b.dataset.add){const s=draft.ex[b.dataset.add].sets;const last=s[s.length-1]||{reps:"",weight:""};s.push({reps:"",weight:last.weight});saveDraft();renderForm();return}
   if(b.dataset.del){draft.ex[b.dataset.del].sets.splice(+b.dataset.k,1);saveDraft();renderForm();return}
-  if(b.dataset.copy){const p=lastFor(b.dataset.copy);if(!p)return;draft.ex[b.dataset.copy].sets=p.e.sets.map(s=>({reps:String(s.reps),weight:String(s.weight)}));saveDraft();renderForm();return}
+  if(b.dataset.copy){const p=lastFor(b.dataset.copy);if(!p)return;draft.ex[b.dataset.copy].sets=p.e.sets.map(s=>({reps:String(s.reps),weight:String(s.weight)}));Object.assign(draft.ex[b.dataset.copy],restParts(p.e.rest));saveDraft();renderForm();return}
   if(b.dataset.clearex){draft.ex[b.dataset.clearex]={sets:[],feel:null};saveDraft();renderForm();toast("toast",exName(b.dataset.clearex)+" retiré de la séance");return}
   if(b.dataset.rmextra){draft.extras=draft.extras.filter(x=>x!==b.dataset.rmextra);delete draft.ex[b.dataset.rmextra];saveDraft();renderForm();extraPicker&&extraPicker.draw()}
 });
@@ -725,7 +734,8 @@ $("saveBtn").addEventListener("click",async()=>{
   const exercises=shownItems().map(it=>{
     const d=draft.ex[it.exId]; if(!d) return null;
     const sets=d.sets.filter(s=>s.reps!==""&&+s.reps>0).map(s=>({reps:+s.reps,weight:+s.weight||0}));
-    return sets.length?{id:it.exId,name:exName(it.exId),sets,feel:d.feel||null}:null;
+    const rest=restOf(d);
+    return sets.length?{id:it.exId,name:exName(it.exId),sets,feel:d.feel||null,...(rest?{rest}:{})}:null;
   }).filter(Boolean);
   if(!exercises.length){toast("toast","Remplis au moins une série (les reps suffisent au poids du corps).",true);return}
   const orig=draft.editId?sessions.find(x=>x.id===draft.editId):null;
@@ -857,11 +867,11 @@ $("histList").addEventListener("click",async e=>{
 /* ---------- export / import ---------- */
 function toCSV(){
   const EN=window.__lang==="en", T=window.__i18n?window.__i18n.t:(x=>x);
-  const head=EN?["date","program","exercise","set","reps","weight_kg","volume_kg","feel","note"]:["date","programme","exercice","serie","reps","poids_kg","volume_kg","ressenti","note"];
+  const head=EN?["date","program","exercise","set","reps","weight_kg","volume_kg","rest","feel","note"]:["date","programme","exercice","serie","reps","poids_kg","volume_kg","repos","ressenti","note"];
   const q=v=>{v=String(v??"");return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const fr=n=>String(n).replace(".",",");
   const lines=[head.join(";")];
-  sorted().forEach(s=>s.exercises.forEach(e=>e.sets.forEach((st,k)=>lines.push([s.date,s.program||"",T(e.name),k+1,st.reps,fr(st.weight),fr(st.reps*st.weight),e.feel?T(FEEL[e.feel].label):"",s.note].map(q).join(";")))));
+  sorted().forEach(s=>s.exercises.forEach(e=>e.sets.forEach((st,k)=>lines.push([s.date,s.program||"",T(e.name),k+1,st.reps,fr(st.weight),fr(st.reps*st.weight),e.rest?mmss(e.rest):"",e.feel?T(FEEL[e.feel].label):"",s.note].map(q).join(";")))));
   return "﻿"+lines.join("\n");
 }
 async function offer(filename,data){
@@ -921,28 +931,34 @@ function chartOptions(){
 $("cEx").addEventListener("change",e=>{cEx=e.target.value;renderChart()});
 $("cMetric").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;cMetric=b.dataset.m;[...$("cMetric").children].forEach(x=>x.setAttribute("aria-pressed",x===b));renderChart()});
 function seriesFor(exId){return sorted().map(s=>{const e=s.exercises.find(x=>x.id===exId);return e&&e.sets?.length?{date:s.date,t:new Date(s.date+"T12:00:00").getTime(),...exStats(e),feel:e.feel,e}:null}).filter(Boolean)}
+function restTicks(lo,hi){const span=Math.max(hi-lo,1);const st=[15,30,60,120,300].find(x=>span/x<=4)||600;let a=Math.floor(lo/st)*st,b=Math.ceil(hi/st)*st;if(a===b){a=Math.max(0,a-st);b=b+st}const t=[];for(let v=a;v<=b;v+=st)t.push(v);return t}
 function niceTicks(lo,hi,n=4){if(lo===hi){lo=lo*0.9;hi=hi*1.1||1}const span=hi-lo,raw=span/n,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,2.5,5,10].map(m=>m*mag).find(m=>m>=raw);const a=Math.floor(lo/st)*st,b=Math.ceil(hi/st)*st;const t=[];for(let v=a;v<=b+st/2;v+=st)t.push(+v.toFixed(6));return t}
 function renderChart(){
   chartOptions();
-  const pts=cEx?seriesFor(cEx):[], unit=cMetric==="reps"?"reps":"kg";
+  const isRest=cMetric==="rest";
+  const pts=(cEx?seriesFor(cEx):[]).filter(p=>!isRest||p.rest), unit=cMetric==="reps"?"reps":isRest?"":"kg";
+  const fv=v=>isRest?mmss(v):fmtKg(v);
+  if(!pts.length&&isRest&&cEx&&seriesFor(cEx).length){$("chart").innerHTML=`<div class="empty">Pas encore de temps de repos noté pour cet exercice. Remplis « Repos entre séries » pendant ta séance.</div>`;$("cStats").innerHTML="";return}
   if(!pts.length){$("chart").innerHTML=`<div class="empty">Pas encore de séance pour cet exercice. La courbe démarre dès la première séance enregistrée.</div>`;$("cStats").innerHTML="";return}
   const W=600,H=260,L=48,R=16,T=26,B=34;
   const ys=pts.map(p=>p[cMetric]);
-  const ticks=niceTicks(Math.min(...ys),Math.max(...ys));
+  const ticks=isRest?restTicks(Math.min(...ys),Math.max(...ys)):niceTicks(Math.min(...ys),Math.max(...ys));
   const y0=ticks[0],y1=ticks[ticks.length-1];
   const t0=pts[0].t,t1=pts[pts.length-1].t;
   const X=t=>t1===t0?(L+W-R)/2:L+(t-t0)/(t1-t0)*(W-L-R);
   const Y=v=>T+(1-(v-y0)/((y1-y0)||1))*(H-T-B);
-  const grid=ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${fmtKg(v)}</text>`).join("");
+  const grid=ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${fv(v)}</text>`).join("");
   const nx=Math.min(pts.length,5);const idx=pts.length<=1?[0]:Array.from({length:nx},(_,i)=>Math.round(i*(pts.length-1)/(nx-1)));
-  const xl=[...new Set(idx)].map(i=>`<text x="${X(pts[i].t)}" y="${H-10}" text-anchor="middle">${fmtDate(pts[i].date)}</text>`).join("");
+  let lastX=-1e9;const xl=[...new Set(idx)].filter(i=>{const x=X(pts[i].t);if(x-lastX<64&&i!==pts.length-1)return false;lastX=x;return true}).map(i=>`<text x="${X(pts[i].t)}" y="${H-10}" text-anchor="middle">${fmtDate(pts[i].date)}</text>`).join("");
   const line=pts.map((p,i)=>`${i?"L":"M"}${X(p.t).toFixed(1)},${Y(p[cMetric]).toFixed(1)}`).join("");
   const area=pts.length>1?`<path d="${line}L${X(t1)},${H-B}L${X(t0)},${H-B}Z" fill="var(--accent)" opacity=".1"/>`:"";
   const col=f=>f?`var(--${f})`:"var(--accent)";
   const dots=pts.map((p,i)=>{const x=X(p.t),y=Y(p[cMetric]),last=i===pts.length-1;
-    return `<g><title>${fmtDate(p.date,true)} — ${fmtKg(p[cMetric])} ${unit} · ${setsLine(p.e)}${p.feel?" · "+FEEL[p.feel].label:""}</title><circle cx="${x}" cy="${y}" r="${last?7:5.5}" fill="var(--surface)" stroke="${col(p.feel)}" stroke-width="${last?3:2.2}"/>${p.feel?`<g transform="translate(${x-6},${y-22}) scale(.5)" color="${col(p.feel)}">${arrowSvg(p.feel).replace("<svg ","<svg width=\"24\" height=\"24\" ")}</g>`:""}</g>`}).join("");
-  $("chart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution ${unit}">${grid}<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--muted)" stroke-width="1"/>${area}${pts.length>1?`<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>`:""}${dots}${xl}</svg>`;
+    return `<g><title>${fmtDate(p.date,true)} — ${fv(p[cMetric])} ${unit} · ${setsLine(p.e)}${p.feel?" · "+FEEL[p.feel].label:""}</title><circle cx="${x}" cy="${y}" r="${last?7:5.5}" fill="var(--surface)" stroke="${col(p.feel)}" stroke-width="${last?3:2.2}"/>${p.feel?`<g transform="translate(${x-6},${y-22}) scale(.5)" color="${col(p.feel)}">${arrowSvg(p.feel).replace("<svg ","<svg width=\"24\" height=\"24\" ")}</g>`:""}</g>`}).join("");
+  $("chart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution ${isRest?"repos":unit}">${grid}<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--muted)" stroke-width="1"/>${area}${pts.length>1?`<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>`:""}${dots}${xl}</svg>`;
   const first=pts[0][cMetric],last=pts[pts.length-1][cMetric],best=Math.max(...ys),diff=last-first;
+  if(isRest){const avg=ys.reduce((a,b)=>a+b,0)/ys.length;
+    $("cStats").innerHTML=`<div class="stat"><span>Actuel</span><b>${mmss(last)}</b></div><div class="stat"><span>Moyenne</span><b>${mmss(avg)}</b></div><div class="stat"><span>Depuis le début</span><b>${diff>0?"+":diff<0?"−":""}${mmss(Math.abs(diff))}</b></div>`;return}
   $("cStats").innerHTML=`<div class="stat"><span>Actuel</span><b>${fmtKg(last)} ${unit}</b></div><div class="stat"><span>Record</span><b>${fmtKg(best)} ${unit}</b></div><div class="stat"><span>Depuis le début</span><b style="color:${diff>0?"var(--up)":diff<0?"var(--down)":"var(--ink)"}">${diff>0?"+":""}${fmtKg(diff)}</b></div>`;
 }
 function renderMini(){
@@ -970,7 +986,7 @@ function editSession(id,focusEx){
   const s=sessions.find(x=>x.id===id); if(!s) return;
   const inProg=new Set(activeProg().items.map(i=>i.exId));
   draft={date:s.date,note:s.note||"",editId:s.id,ex:{},extras:[]};
-  s.exercises.forEach(e=>{draft.ex[e.id]={sets:(e.sets||[]).map(x=>({reps:String(x.reps),weight:String(x.weight)})),feel:e.feel||null};if(!inProg.has(e.id))draft.extras.push(e.id)});
+  s.exercises.forEach(e=>{draft.ex[e.id]={sets:(e.sets||[]).map(x=>({reps:String(x.reps),weight:String(x.weight)})),feel:e.feel||null,...restParts(e.rest)};if(!inProg.has(e.id))draft.extras.push(e.id)});
   saveDraft(); $("sDate").value=draft.date; $("sNote").value=draft.note;
   showTab("log"); renderForm(); renderEditBanner();
   if(focusEx){const card=document.querySelector(`[data-feel][data-ex="${focusEx}"]`)?.closest(".ex");if(card){card.scrollIntoView({block:"center"});card.classList.add("flash");setTimeout(()=>card.classList.remove("flash"),1600);const inp=card.querySelector("input");inp&&inp.focus({preventScroll:true})}}
@@ -1198,7 +1214,7 @@ if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWor
   "Une fenêtre de téléchargement est déjà ouverte.":"A download window is already open.",
   "Ce fichier n'est pas une sauvegarde .json du carnet.":"This file isn't a .json backup from the log.",
   "Tes séances apparaîtront ici, de la plus récente à la plus ancienne.":"Your sessions will show up here, newest first.",
-  "Supprimer cette séance ?":"Delete this session?","Modifier cet exercice":"Edit this exercise","Supprimer cet exercice":"Delete this exercise","Exercice supprimé de la séance.":"Exercise removed from the session.","Séance supprimée (plus aucun exercice).":"Session deleted (no exercises left).","Supprimer…":"Delete…","Séance modifiée":"Session updated","Séance supprimée.":"Session deleted.","Modification annulée.":"Editing cancelled.","Annuler la modification":"Cancel editing","Enregistrer les modifications":"Save changes","Suppression impossible pour le moment.":"Can't delete right now.",
+  "Supprimer cette séance ?":"Delete this session?","Repos entre séries":"Rest between sets","Repos":"Rest","Moyenne":"Average","Pas encore de temps de repos noté pour cet exercice. Remplis « Repos entre séries » pendant ta séance.":"No rest time logged for this exercise yet. Fill in “Rest between sets” during your session.","Modifier cet exercice":"Edit this exercise","Supprimer cet exercice":"Delete this exercise","Exercice supprimé de la séance.":"Exercise removed from the session.","Séance supprimée (plus aucun exercice).":"Session deleted (no exercises left).","Supprimer…":"Delete…","Séance modifiée":"Session updated","Séance supprimée.":"Session deleted.","Modification annulée.":"Editing cancelled.","Annuler la modification":"Cancel editing","Enregistrer les modifications":"Save changes","Suppression impossible pour le moment.":"Can't delete right now.",
   "volume":"volume","▾":"▾",
   /* charts */
   "Charge max":"Max weight","Volume":"Volume","Reps totales":"Total reps","Actuel":"Current","Record":"Best","Depuis le début":"Since start",
@@ -1349,6 +1365,8 @@ if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWor
     [/^(\d+) séance\(s\) de ce téléphone ajoutée\(s\) à ton compte\.$/, (m,n)=>`${n} session(s) from this phone added to your account.`],
     [/^E-mail de réinitialisation envoyé à (.*)\.$/, (m,e)=>`Reset email sent to ${e}.`],
     [/^Le téléchargement n'est pas disponible ici\. Copie le contenu ci-dessous et colle-le dans un fichier (.*)\.$/, (m,f)=>`Download isn't available here. Copy the content below and paste it into a file named ${f}.`],
+    [/^(.*) (minutes|secondes) de repos$/, (m,e,u)=>`${t(e)} rest ${u==="minutes"?"minutes":"seconds"}`],
+    [/^Évolution repos$/, ()=>`Rest progress`],
     [/^Mouvement : (.*)$/, (m,e)=>`Movement: ${t(e)}`],
     [/^(.*) série (\d+) (répétitions|poids en kg)$/, (m,e,n,k)=>`${t(e)} set ${n} ${k==="répétitions"?"reps":"weight in kg"}`],
     [/^Supprimer la série (\d+)$/, (m,n)=>`Delete set ${n}`],
