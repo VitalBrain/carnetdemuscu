@@ -7,6 +7,7 @@ Carnet de séances de musculation, installable sur téléphone (PWA). Gratuit, s
 - Programmes modifiables, exercices perso
 - Courbes de progression, export CSV / JSON
 - Connexion Google ou e-mail (Firebase) : synchro entre appareils, fonctionne hors réseau
+- Coach IA (onglet Coach) : analyse les séances et conseille charges, reps et repos. Dans l'app installée, chaque utilisateur choisit son fournisseur et met sa propre clé (Google Gemini ou OpenRouter : gratuits ; Anthropic : payant). La clé reste dans le navigateur. Dans la version Claude, le coach passe par le compte Claude, sans clé.
 
 ☕ Soutenir le projet : https://ko-fi.com/carnetdemuscu
 

@@ -31,7 +31,7 @@ h1 span{color:var(--accent)}
 h2{font-family:var(--f-display);font-weight:700;font-size:1.25rem;text-transform:uppercase;letter-spacing:.03em;margin:0}
 .sub{color:var(--muted);font-size:.85rem;margin:4px 0 0}
 nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:4px;padding-block:10px;border-bottom:1px solid var(--line);margin-bottom:16px}
-nav.tabs button{flex:1;min-width:0;font-family:var(--f-display);font-weight:600;font-size:1rem;letter-spacing:.04em;text-transform:uppercase;background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 4px;border-radius:8px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav.tabs button{flex:1 1 auto;min-width:0;font-family:var(--f-display);font-weight:600;font-size:1rem;letter-spacing:.04em;text-transform:uppercase;background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 4px;border-radius:8px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
 button{font-family:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -142,6 +142,20 @@ td.exact .x{font-size:1rem;padding:2px 5px}
 .rest{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .rest-in{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
 .rest-in input{width:58px}
+/* coach */
+#aiSetup summary{list-style:none;cursor:pointer}
+#aiSetup summary::-webkit-details-marker{display:none}
+.field{display:flex;flex-direction:column;gap:4px}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:58vh;min-height:160px;overflow-y:auto;padding:4px 2px}
+.msg{max-width:88%;padding:10px 12px;border-radius:12px;font-size:.92rem;line-height:1.45;overflow-wrap:anywhere}
+.msg.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}
+.msg.err{border-color:var(--down);color:var(--down)}
+.msg.pending{color:var(--muted);font-style:italic}
+.msg ul{margin:4px 0;padding-left:18px}
+.chatform{display:flex;flex-direction:column;gap:8px}
+.chatform textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;resize:vertical;min-height:56px}
+@media (max-width:420px){nav.tabs{gap:2px}nav.tabs button{font-size:.74rem;letter-spacing:0;padding-inline:2px}}
 /* history */
 .sess{background:var(--surface);border:1px solid var(--line);border-radius:10px}
 .sess summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -191,6 +205,7 @@ td.exact .x{font-size:1rem;padding:2px 5px}
     <button role="tab" aria-selected="false" data-tab="prog">Programmes</button>
     <button role="tab" aria-selected="false" data-tab="hist">Historique</button>
     <button role="tab" aria-selected="false" data-tab="chart">Courbes</button>
+    <button role="tab" aria-selected="false" data-tab="coach">Coach</button>
   </nav>
 
   <!-- SÉANCE -->
@@ -290,6 +305,36 @@ td.exact .x{font-size:1rem;padding:2px 5px}
     </div>
     <div class="label">Programme actif · charge max</div>
     <div class="mini" id="miniGrid"></div>
+  </section>
+
+  <!-- COACH -->
+  <section id="p-coach" class="stack" hidden>
+    <details class="card" id="aiSetup">
+      <summary class="row between"><h2>Coach IA</h2><span class="pill" id="aiState">…</span></summary>
+      <div class="stack" style="margin-top:12px">
+        <label class="field"><span class="label">Fournisseur</span><select id="aiProv"></select></label>
+        <label class="field" id="aiKeyRow"><span class="label">Clé API</span><input type="password" id="aiKey" autocomplete="off" spellcheck="false" placeholder="Colle ta clé ici"></label>
+        <label class="field" id="aiModelRow"><span class="label">Modèle</span><input type="text" id="aiModel" autocomplete="off" spellcheck="false"></label>
+        <p class="sub" id="aiHelp" style="margin:0"></p>
+        <p class="sub" style="margin:0">Ta clé reste sur cet appareil : elle n'est ni synchronisée ni envoyée ailleurs qu'au fournisseur choisi. Le coach reçoit ton programme et tes 10 dernières séances.</p>
+      </div>
+    </details>
+    <div class="chips" id="coachQuick">
+      <button class="chip" data-q="last">Analyse ma dernière séance</button>
+      <button class="chip" data-q="next">Prochaine séance</button>
+      <button class="chip" data-q="prog">Est-ce que je progresse ?</button>
+      <button class="chip" data-q="rest">Mes temps de repos</button>
+      <button class="chip" data-q="newp">Nouveau programme</button>
+    </div>
+    <div class="chat" id="chatLog" data-noi18n aria-live="polite"></div>
+    <form id="chatForm" class="chatform">
+      <textarea id="chatIn" rows="2" placeholder="Pose ta question au coach…" aria-label="Message au coach"></textarea>
+      <div class="row" style="justify-content:space-between">
+        <button type="button" class="btn ghost" id="chatClear" style="color:var(--muted)">Effacer la conversation</button>
+        <span class="row"><button type="button" class="btn" id="chatStop" hidden>Stop</button><button class="btn solid" id="chatSend">Envoyer</button></span>
+      </div>
+    </form>
+    <p class="sub" style="margin:0">Conseils généraux d'entraînement, pas un avis médical. En cas de douleur, arrête l'exercice et consulte.</p>
   </section>
 
   <footer class="kofi-foot">
@@ -947,7 +992,8 @@ $("miniGrid").addEventListener("click",e=>{const b=e.target.closest("[data-goto]
 /* ---------- tabs ---------- */
 function showTab(t){
   document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===t));
-  ["log","prog","hist","chart"].forEach(k=>$("p-"+k).hidden=k!==t);
+  ["log","prog","hist","chart","coach"].forEach(k=>$("p-"+k).hidden=k!==t);
+  if(t==="coach"){const l=$("chatLog");l.scrollTop=l.scrollHeight}
   window.scrollTo({top:0});
 }
 document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b)showTab(b.dataset.tab)});
@@ -978,6 +1024,148 @@ function onData(){renderProgSel();renderLast();renderForm();renderEditBanner();r
 onData();
 </script>
 
+<script>
+/* ---------- COACH IA ---------- */
+(function(){
+  const AI_KEY="carnet-muscu-ai", CHAT_KEY="carnet-muscu-chat";
+  const inClaude=!!window.claude;
+  const PROV={
+    claude:{label:"Claude — inclus, sans clé",model:"",needsKey:false},
+    gemini:{label:"Google Gemini — gratuit avec une clé",model:"gemini-flash-latest",needsKey:true,keyUrl:"https://aistudio.google.com/apikey",keyHelp:"Clé gratuite sur aistudio.google.com/apikey (compte Google)."},
+    openrouter:{label:"OpenRouter — modèles gratuits",model:"openrouter/free",needsKey:true,keyUrl:"https://openrouter.ai/keys",keyHelp:"Clé gratuite sur openrouter.ai/keys. Modèles « :free » : environ 50 messages par jour."},
+    anthropic:{label:"Anthropic (Claude) — clé payante",model:"claude-haiku-5-5",needsKey:true,keyUrl:"https://console.anthropic.com/settings/keys",keyHelp:"Clé sur console.anthropic.com (facturée à l'usage, quelques centimes par conversation)."}
+  };
+  const avail=inClaude?["claude"]:["gemini","openrouter","anthropic"];
+  let cfg={prov:avail[0],keys:{},models:{}};
+  try{const c=JSON.parse(localStorage.getItem(AI_KEY)||"null");if(c&&avail.includes(c.prov))cfg={...cfg,...c,keys:c.keys||{},models:c.models||{}}}catch(e){}
+  const saveCfg=()=>{try{localStorage.setItem(AI_KEY,JSON.stringify(cfg))}catch(e){}};
+  let chat=[]; try{chat=JSON.parse(localStorage.getItem(CHAT_KEY)||"[]")||[]}catch(e){}
+  const saveChat=()=>{chat=chat.slice(-30);try{localStorage.setItem(CHAT_KEY,JSON.stringify(chat))}catch(e){}};
+  const EN=()=>window.__lang==="en";
+
+  /* ---- UI ---- */
+  const provSel=$("aiProv"), keyIn=$("aiKey"), modelIn=$("aiModel"), keyRow=$("aiKeyRow"), help=$("aiHelp");
+  provSel.innerHTML=avail.map(p=>`<option value="${p}">${PROV[p].label}</option>`).join("");
+  function paintSetup(){
+    const P=PROV[cfg.prov];
+    provSel.value=cfg.prov;
+    keyRow.hidden=!P.needsKey; $("aiModelRow").hidden=!P.needsKey;
+    keyIn.value=cfg.keys[cfg.prov]||""; modelIn.value=cfg.models[cfg.prov]||P.model;
+    help.innerHTML=P.needsKey?`${esc(P.keyHelp)} <a href="${P.keyUrl}" target="_blank" rel="noopener">Obtenir une clé</a>`:"Le coach utilise ton compte Claude : rien à configurer.";
+    $("aiState").textContent=ready()?"Prêt":"Clé manquante";
+    $("aiState").className="pill"+(ready()?"":" warn");
+    $("aiSetup").open=!ready();
+  }
+  const ready=()=>!PROV[cfg.prov].needsKey||!!(cfg.keys[cfg.prov]||"").trim();
+  provSel.addEventListener("change",()=>{cfg.prov=provSel.value;saveCfg();paintSetup()});
+  keyIn.addEventListener("input",()=>{cfg.keys[cfg.prov]=keyIn.value.trim();saveCfg();$("aiState").textContent=ready()?"Prêt":"Clé manquante";$("aiState").className="pill"+(ready()?"":" warn")});
+  modelIn.addEventListener("input",()=>{cfg.models[cfg.prov]=modelIn.value.trim();saveCfg()});
+
+  /* ---- context sent to the coach ---- */
+  const FEELTXT={up:"easy → increase next time",flat:"good → keep",down:"too hard → reduce"};
+  function context(){
+    const p=activeProg();
+    const prog=p.items.map(i=>`- ${exName(i.exId)}: target ${i.sets}×${i.reps}`).join("\n")||"(empty)";
+    const recent=sorted().slice(-10).map(s=>`${s.date}${s.note?` — note: ${s.note}`:""}\n`+s.exercises.map(e=>`  - ${e.name}: ${e.sets.map(x=>`${x.reps}×${+x.weight?x.weight+"kg":"bodyweight"}`).join(", ")}${e.rest?`; rest ${mmss(e.rest)}`:""}${e.feel?`; feel: ${FEELTXT[e.feel]}`:""}`).join("\n")).join("\n");
+    return `Active program "${p.name}" (running for ${weeksSince(p.startedAt)} weeks):\n${prog}\n\nLast sessions (oldest → newest; weights in kg, "DB" = per dumbbell):\n${recent||"(no session logged yet)"}`;
+  }
+  function system(){
+    return `You are the strength-training coach built into the "Carnet Muscu" workout log app. Answer in ${EN()?"English":"French (tutoie l'utilisateur)"}.
+Be concrete and brief (under ~180 words unless asked for a full program): give exact weights in kg, sets × reps and rest times, based on the user's logged data below.
+Progression rule used by the app: feel arrow ↗ (easy) → add ~2.5–5 % load or 1–2 reps next time; → (good) → keep; ↘ (too hard) → reduce ~5–10 % or fewer reps.
+Spot stalls, imbalances and rest times that are too short/long for the goal. Use short bullet points. No medical diagnosis: if the user mentions pain or injury, tell them to stop that exercise and see a health professional.
+
+USER DATA
+${context()}`;
+  }
+
+  /* ---- providers ---- */
+  async function ask(msgs,signal,onText){
+    const prov=cfg.prov, key=(cfg.keys[prov]||"").trim(), model=(cfg.models[prov]||PROV[prov].model).trim(), sys=system();
+    if(prov==="claude"){
+      const sample=await claude.use("sample");
+      if(!sample) throw {code:"unavailable"};
+      const turns=msgs.map((m,i)=>({role:m.role,content:i===0?`${sys}\n\n---\n${m.content}`:m.content}));
+      const r=await sample(turns,{signal,cache:false,onText:({text})=>onText(text)});
+      return r.text;
+    }
+    let res,data;
+    if(prov==="gemini"){
+      res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:"POST",signal,headers:{"content-type":"application/json","x-goog-api-key":key},
+        body:JSON.stringify({system_instruction:{parts:[{text:sys}]},contents:msgs.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]})),generationConfig:{maxOutputTokens:1500}})});
+      data=await res.json().catch(()=>({}));
+      if(!res.ok) throw {status:res.status,message:data.error&&data.error.message};
+      return (data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts||[]).map(p=>p.text||"").join("");
+    }
+    if(prov==="openrouter"){
+      res=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",signal,headers:{"content-type":"application/json","authorization":"Bearer "+key,"HTTP-Referer":location.origin,"X-Title":"Carnet Muscu"},
+        body:JSON.stringify({model,max_tokens:1500,messages:[{role:"system",content:sys},...msgs]})});
+      data=await res.json().catch(()=>({}));
+      if(!res.ok) throw {status:res.status,message:data.error&&data.error.message};
+      return (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||"";
+    }
+    if(prov==="anthropic"){
+      res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        body:JSON.stringify({model,max_tokens:1500,system:sys,messages:msgs})});
+      data=await res.json().catch(()=>({}));
+      if(!res.ok) throw {status:res.status,message:data.error&&data.error.message};
+      return (data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("");
+    }
+  }
+  function errText(e){
+    const en=EN();
+    if(e&&(e.name==="AbortError"||e.code==="cancelled")) return en?"Stopped.":"Arrêté.";
+    if(e&&e.code==="not_granted") return en?"Claude access was declined. Reload the page to allow it.":"Accès à Claude refusé. Recharge la page pour l'autoriser.";
+    if(e&&e.code==="rate_limited") return en?"Too many requests. Wait a moment.":"Trop de demandes. Patiente un instant.";
+    if(e&&e.code==="unavailable") return en?"The coach isn't available here.":"Le coach n'est pas disponible ici.";
+    if(e&&(e.status===401||e.status===403)) return en?"API key refused. Check it in the settings above.":"Clé API refusée. Vérifie-la dans les réglages ci-dessus.";
+    if(e&&e.status===429) return en?"Free limit reached for now. Try again later or switch provider.":"Limite gratuite atteinte pour le moment. Réessaie plus tard ou change de fournisseur.";
+    if(e&&e.status===404) return en?"Unknown model. Check the model name in the settings.":"Modèle inconnu. Vérifie le nom du modèle dans les réglages.";
+    if(e instanceof TypeError) return en?"No connection to the AI service.":"Pas de connexion au service d'IA.";
+    return (en?"Error: ":"Erreur : ")+((e&&(e.message||e.status||e.code))||e);
+  }
+
+  /* ---- rendering ---- */
+  const md=t=>esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/^#{1,4}\s*(.+)$/gm,"<b>$1</b>").replace(/^\s*[-*•]\s+(.+)$/gm,"<li>$1</li>").replace(/(<li>.*<\/li>\n?)+/g,m=>`<ul>${m.replace(/\n/g,"")}</ul>`).replace(/\n{2,}/g,"<br><br>").replace(/\n/g,"<br>");
+  const log=$("chatLog");
+  function render(){
+    log.innerHTML=chat.length?chat.map(m=>`<div class="msg ${m.role==="user"?"me":"ai"}${m.err?" err":""}">${m.role==="user"?esc(m.content).replace(/\n/g,"<br>"):md(m.content)}</div>`).join(""):`<div class="msg ai">${EN()?"Hi! I'm your coach. I can see your program and your last sessions. Ask me anything, or tap a suggestion.":"Salut ! Je suis ton coach. Je vois ton programme et tes dernières séances. Pose-moi une question, ou touche une suggestion."}</div>`;
+    log.scrollTop=log.scrollHeight;
+  }
+  const QUICK={
+    last:["Analyse ma dernière séance : points forts et ce que je dois changer.","Analyse my last session: strengths and what I should change."],
+    next:["Que dois-je faire à la prochaine séance ? Donne-moi les charges et reps exercice par exercice.","What should I do next session? Give me weights and reps exercise by exercise."],
+    prog:["Est-ce que je progresse ? Repère les exercices qui stagnent et dis-moi quoi faire.","Am I progressing? Find the exercises that are stalling and tell me what to do."],
+    rest:["Mes temps de repos sont-ils adaptés ? Conseille-moi par exercice.","Are my rest times right? Advise me per exercise."],
+    newp:["Propose-moi un nouveau programme full body pour le mois prochain, avec séries, reps et repos.","Suggest a new full-body program for next month, with sets, reps and rest."]
+  };
+  let ctl=null;
+  async function send(text){
+    text=(text||"").trim(); if(!text||ctl) return;
+    if(!ready()){$("aiSetup").open=true;keyIn.focus();return}
+    chat=chat.filter(m=>!m.err);
+    chat.push({role:"user",content:text}); saveChat(); render();
+    const bubble=document.createElement("div"); bubble.className="msg ai pending"; bubble.textContent=EN()?"Thinking…":"Je réfléchis…"; log.appendChild(bubble); log.scrollTop=log.scrollHeight;
+    ctl=new AbortController(); $("chatStop").hidden=false; $("chatSend").disabled=true;
+    try{
+      const msgs=chat.filter(m=>!m.err).slice(-12).map(m=>({role:m.role,content:m.content}));
+      while(msgs.length&&msgs[0].role!=="user") msgs.shift();
+      const out=await ask(msgs,ctl.signal,t=>{bubble.classList.remove("pending");bubble.innerHTML=md(t);log.scrollTop=log.scrollHeight});
+      chat.push({role:"assistant",content:out||(EN()?"(empty answer)":"(réponse vide)")});
+      $("aiSetup").open=false;
+    }catch(e){ chat.push({role:"assistant",content:errText(e),err:true}); }
+    finally{ ctl=null; $("chatStop").hidden=true; $("chatSend").disabled=false; saveChat(); render(); }
+  }
+  $("chatForm").addEventListener("submit",e=>{e.preventDefault();const v=$("chatIn").value;$("chatIn").value="";send(v)});
+  $("chatIn").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("chatForm").requestSubmit()}});
+  $("chatStop").addEventListener("click",()=>ctl&&ctl.abort());
+  $("coachQuick").addEventListener("click",e=>{const b=e.target.closest("[data-q]");if(b)send(QUICK[b.dataset.q][EN()?1:0])});
+  $("chatClear").addEventListener("click",()=>{chat=[];saveChat();render()});
+  $("langBtn")&&$("langBtn").addEventListener("click",()=>setTimeout(()=>{if(!chat.length)render()},0));
+  paintSetup(); render();
+  if(inClaude) claude.use("sample").then(s=>{if(!s){$("aiState").textContent="Indisponible";$("aiState").className="pill warn"}});
+})();
+</script>
 <script>
 /* ---------- FR / EN ---------- */
 (function(){
@@ -1037,7 +1225,14 @@ onData();
   "Une fenêtre de téléchargement est déjà ouverte.":"A download window is already open.",
   "Ce fichier n'est pas une sauvegarde .json du carnet.":"This file isn't a .json backup from the log.",
   "Tes séances apparaîtront ici, de la plus récente à la plus ancienne.":"Your sessions will show up here, newest first.",
-  "Supprimer cette séance ?":"Delete this session?","Repos entre séries":"Rest between sets","Repos":"Rest","Moyenne":"Average","Pas encore de temps de repos noté pour cet exercice. Remplis « Repos entre séries » pendant ta séance.":"No rest time logged for this exercise yet. Fill in “Rest between sets” during your session.","Modifier cet exercice":"Edit this exercise","Supprimer cet exercice":"Delete this exercise","Exercice supprimé de la séance.":"Exercise removed from the session.","Séance supprimée (plus aucun exercice).":"Session deleted (no exercises left).","Supprimer…":"Delete…","Séance modifiée":"Session updated","Séance supprimée.":"Session deleted.","Modification annulée.":"Editing cancelled.","Annuler la modification":"Cancel editing","Enregistrer les modifications":"Save changes","Suppression impossible pour le moment.":"Can't delete right now.",
+  "Supprimer cette séance ?":"Delete this session?","Coach":"Coach","Coach IA":"AI coach","Fournisseur":"Provider","Clé API":"API key","Modèle":"Model","Colle ta clé ici":"Paste your key here","Prêt":"Ready","Clé manquante":"Key missing","Indisponible":"Unavailable",
+  "Claude — inclus, sans clé":"Claude — included, no key","Google Gemini — gratuit avec une clé":"Google Gemini — free with a key","OpenRouter — modèles gratuits":"OpenRouter — free models","Anthropic (Claude) — clé payante":"Anthropic (Claude) — paid key",
+  "Clé gratuite sur aistudio.google.com/apikey (compte Google).":"Free key at aistudio.google.com/apikey (Google account).","Clé gratuite sur openrouter.ai/keys. Modèles « :free » : environ 50 messages par jour.":"Free key at openrouter.ai/keys. “:free” models: about 50 messages a day.",
+  "Clé sur console.anthropic.com (facturée à l'usage, quelques centimes par conversation).":"Key at console.anthropic.com (pay as you go, a few cents per conversation).","Obtenir une clé":"Get a key","Le coach utilise ton compte Claude : rien à configurer.":"The coach uses your Claude account: nothing to set up.",
+  "Ta clé reste sur cet appareil : elle n'est ni synchronisée ni envoyée ailleurs qu'au fournisseur choisi. Le coach reçoit ton programme et tes 10 dernières séances.":"Your key stays on this device: it isn't synced or sent anywhere except to the provider you chose. The coach receives your program and your last 10 sessions.",
+  "Analyse ma dernière séance":"Analyse my last session","Prochaine séance":"Next session","Est-ce que je progresse ?":"Am I progressing?","Mes temps de repos":"My rest times","Nouveau programme":"New program",
+  "Pose ta question au coach…":"Ask the coach…","Message au coach":"Message to the coach","Effacer la conversation":"Clear conversation","Envoyer":"Send","Stop":"Stop",
+  "Conseils généraux d'entraînement, pas un avis médical. En cas de douleur, arrête l'exercice et consulte.":"General training advice, not medical advice. If you feel pain, stop the exercise and see a professional.","Repos entre séries":"Rest between sets","Repos":"Rest","Moyenne":"Average","Pas encore de temps de repos noté pour cet exercice. Remplis « Repos entre séries » pendant ta séance.":"No rest time logged for this exercise yet. Fill in “Rest between sets” during your session.","Modifier cet exercice":"Edit this exercise","Supprimer cet exercice":"Delete this exercise","Exercice supprimé de la séance.":"Exercise removed from the session.","Séance supprimée (plus aucun exercice).":"Session deleted (no exercises left).","Supprimer…":"Delete…","Séance modifiée":"Session updated","Séance supprimée.":"Session deleted.","Modification annulée.":"Editing cancelled.","Annuler la modification":"Cancel editing","Enregistrer les modifications":"Save changes","Suppression impossible pour le moment.":"Can't delete right now.",
   "volume":"volume","▾":"▾",
   /* charts */
   "Charge max":"Max weight","Volume":"Volume","Reps totales":"Total reps","Actuel":"Current","Record":"Best","Depuis le début":"Since start",
@@ -1212,12 +1407,12 @@ onData();
   const SKIP=/^(SCRIPT|STYLE|TEXTAREA)$/;
   function apply(n){
     if(n.nodeType===3){
-      const p=n.parentNode; if(!p||SKIP.test(p.nodeName)) return;
+      const p=n.parentNode; if(!p||SKIP.test(p.nodeName)||(p.closest&&p.closest("[data-noi18n]"))) return;
       if(n.__en!==undefined&&n.data===n.__en) return;
       const fr=n.data, en=tr(fr);
       if(en!=null&&en!==fr){n.__fr=fr;n.__en=en;n.data=en;}
     }else if(n.nodeType===1){
-      if(SKIP.test(n.nodeName)||n.id==="langBtn") return;
+      if(SKIP.test(n.nodeName)||n.id==="langBtn"||n.hasAttribute("data-noi18n")) return;
       for(const a of ATTRS){
         const v=n.getAttribute(a); if(v==null) continue;
         n.__a=n.__a||{}; const st=n.__a[a]; if(st&&st.en===v) continue;
