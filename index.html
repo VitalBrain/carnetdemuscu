@@ -165,6 +165,12 @@ td.exact .x{font-size:1rem;padding:2px 5px}
 .chatform{display:flex;flex-direction:column;gap:8px}
 .chatform textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;resize:vertical;min-height:56px}
 @media (max-width:420px){nav.tabs{gap:2px}nav.tabs button{font-size:.74rem;letter-spacing:0;padding-inline:2px}}
+.ex.mini-done{flex-direction:row;align-items:center;gap:8px;padding:8px 12px;background:var(--field);border-color:var(--line);cursor:pointer}
+.ex.mini-done:hover{border-color:var(--muted)}
+.ex.mini-done .ck{color:var(--up);font-weight:700}
+.ex.mini-done .mn{text-transform:lowercase;font-size:.88rem;font-weight:500;color:var(--muted);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex.mini-done .ms{font-size:.72rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.done-btn{color:var(--up);border-color:var(--up)}
 /* history */
 .sess{background:var(--surface);border:1px solid var(--line);border-radius:10px}
 .sess summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -717,6 +723,10 @@ function renderForm(){
   $("exList").innerHTML=items.map((it,i)=>{
     const d=ensureDraft(it), prev=lastFor(it.exId), name=exName(it.exId);
     const filled=d.sets.some(s=>s.reps!=="");
+    if(d.done&&filled){
+      const sum={sets:d.sets.filter(x=>x.reps!=="").map(x=>({reps:+x.reps,weight:+x.weight||0})),rest:restOf(d)};
+      return `<article class="ex mini-done${it.extra?" extra":""}" data-reopen="${it.exId}" role="button" tabindex="0" aria-label="Rouvrir ${esc(name)}"><span class="ck" aria-hidden="true">✓</span><span class="mn">${esc(name)}</span><span class="ms num">${esc(setsLine(sum))}</span>${arrowChip(d.feel)}</article>`;
+    }
     const prevHtml=prev?`<div class="prev">Dernière fois (${fmtDate(prev.date)}) : <span class="num">${esc(setsLine(prev.e))}</span>${arrowChip(prev.e.feel)}${prev.e.feel?`<span class="hint ${prev.e.feel}">${FEEL[prev.e.feel].hint}</span>`:""}<button class="btn ghost" data-copy="${it.exId}">Reprendre</button></div>`:`<div class="prev">Première séance sur cet exercice</div>`;
     const rows=d.sets.map((s,k)=>`<span class="s">S${k+1}</span>
       <input type="number" inputmode="numeric" min="0" step="1" id="r-${it.exId}-${k}" data-ex="${it.exId}" data-k="${k}" data-f="reps" value="${esc(s.reps)}" aria-label="${esc(name)} série ${k+1} répétitions">
@@ -731,6 +741,7 @@ function renderForm(){
       <div class="row"><button class="btn ghost" data-add="${it.exId}">+ Ajouter une série</button></div>
       <div class="rest"><span class="label">Repos entre séries</span><span class="rest-in"><input type="number" inputmode="numeric" min="0" max="15" step="1" id="rm-${it.exId}" data-ex="${it.exId}" data-f="restM" value="${esc(d.restM??"")}" placeholder="1" aria-label="${esc(name)} minutes de repos"><span>min</span><input type="number" inputmode="numeric" min="0" max="59" step="5" id="rs-${it.exId}" data-ex="${it.exId}" data-f="restS" value="${esc(d.restS??"")}" placeholder="30" aria-label="${esc(name)} secondes de repos"><span>s</span></span></div>
       <div class="feel" role="group" aria-label="Ressenti">${["up","flat","down"].map(f=>`<button class="${f}" data-feel="${f}" data-ex="${it.exId}" aria-pressed="${d.feel===f}">${arrowSvg(f)}${FEEL[f].label}</button>`).join("")}</div>
+      <div class="row" style="justify-content:flex-end"><button class="btn sm done-btn" data-done="${it.exId}">✓ Exercice fait</button></div>
     </article>`;
   }).join("");
   saveDraft();
@@ -744,10 +755,14 @@ $("exList").addEventListener("input",e=>{
   t.closest(".ex").classList.toggle("done",sets.some(s=>s.reps!==""));
   saveDraft();
 });
+function reopenEx(id){const d=draft.ex[id];if(!d)return;d.done=false;saveDraft();renderForm();const c=document.querySelector(`[data-done="${id}"]`)?.closest(".ex");c&&c.scrollIntoView({block:"nearest"})}
+$("exList").addEventListener("keydown",e=>{const m=e.target.closest&&e.target.closest("[data-reopen]");if(m&&(e.key==="Enter"||e.key===" ")){e.preventDefault();reopenEx(m.dataset.reopen)}});
 $("exList").addEventListener("click",e=>{
+  const m=e.target.closest("[data-reopen]"); if(m){reopenEx(m.dataset.reopen);return}
   const b=e.target.closest("button"); if(!b) return;
   if(b.dataset.demo){const id=b.dataset.demo;openDemos.has(id)?openDemos.delete(id):openDemos.add(id);renderForm();return}
-  if(b.dataset.feel){const d=draft.ex[b.dataset.ex];d.feel=d.feel===b.dataset.feel?null:b.dataset.feel;saveDraft();renderForm();return}
+  if(b.dataset.feel){const d=draft.ex[b.dataset.ex];d.feel=d.feel===b.dataset.feel?null:b.dataset.feel;if(d.feel&&!draft.editId&&d.sets.length&&d.sets.every(x=>x.reps!==""))d.done=true;saveDraft();renderForm();return}
+  if(b.dataset.done){const d=draft.ex[b.dataset.done];if(!d.sets.some(x=>x.reps!=="")){toast("toast","Remplis au moins une série avant de valider.",true);return}d.done=true;saveDraft();renderForm();return}
   if(b.dataset.add){const s=draft.ex[b.dataset.add].sets;const last=s[s.length-1]||{reps:"",weight:""};s.push({reps:"",weight:last.weight});saveDraft();renderForm();return}
   if(b.dataset.del){draft.ex[b.dataset.del].sets.splice(+b.dataset.k,1);saveDraft();renderForm();return}
   if(b.dataset.copy){const p=lastFor(b.dataset.copy);if(!p)return;draft.ex[b.dataset.copy].sets=p.e.sets.map(s=>({reps:String(s.reps),weight:String(s.weight)}));Object.assign(draft.ex[b.dataset.copy],restParts(p.e.rest));saveDraft();renderForm();return}
@@ -1402,7 +1417,7 @@ ${context()}`;
   "Une fenêtre de téléchargement est déjà ouverte.":"A download window is already open.",
   "Ce fichier n'est pas une sauvegarde .json du carnet.":"This file isn't a .json backup from the log.",
   "Tes séances apparaîtront ici, de la plus récente à la plus ancienne.":"Your sessions will show up here, newest first.",
-  "Supprimer cette séance ?":"Delete this session?","Coach":"Coach","Coach IA":"AI coach","Fournisseur":"Provider","Clé API":"API key","Modèle":"Model","Colle ta clé ici":"Paste your key here","Prêt":"Ready","Clé manquante":"Key missing","Indisponible":"Unavailable",
+  "Supprimer cette séance ?":"Delete this session?","✓ Exercice fait":"✓ Done","Remplis au moins une série avant de valider.":"Fill in at least one set first.","Coach":"Coach","Coach IA":"AI coach","Fournisseur":"Provider","Clé API":"API key","Modèle":"Model","Colle ta clé ici":"Paste your key here","Prêt":"Ready","Clé manquante":"Key missing","Indisponible":"Unavailable",
   "Claude — inclus, sans clé":"Claude — included, no key","Google Gemini — gratuit avec une clé":"Google Gemini — free with a key","OpenRouter — modèles gratuits":"OpenRouter — free models","Anthropic (Claude) — clé payante":"Anthropic (Claude) — paid key",
   "Clé gratuite sur aistudio.google.com/apikey (compte Google).":"Free key at aistudio.google.com/apikey (Google account).","Clé gratuite sur openrouter.ai/keys. Modèles « :free » : environ 50 messages par jour.":"Free key at openrouter.ai/keys. “:free” models: about 50 messages a day.",
   "Clé sur console.anthropic.com (facturée à l'usage, quelques centimes par conversation).":"Key at console.anthropic.com (pay as you go, a few cents per conversation).","Obtenir une clé":"Get a key","Le coach utilise ton compte Claude : rien à configurer.":"The coach uses your Claude account: nothing to set up.",
@@ -1562,6 +1577,7 @@ ${context()}`;
     [/^Le téléchargement n'est pas disponible ici\. Copie le contenu ci-dessous et colle-le dans un fichier (.*)\.$/, (m,f)=>`Download isn't available here. Copy the content below and paste it into a file named ${f}.`],
     [/^(.*) (minutes|secondes) de repos$/, (m,e,u)=>`${t(e)} rest ${u==="minutes"?"minutes":"seconds"}`],
     [/^Évolution repos$/, ()=>`Rest progress`],
+    [/^Rouvrir (.*)$/, (m,e)=>`Reopen ${t(e)}`],
     [/^Mouvement : (.*)$/, (m,e)=>`Movement: ${t(e)}`],
     [/^(.*) série (\d+) (répétitions|poids en kg)$/, (m,e,n,k)=>`${t(e)} set ${n} ${k==="répétitions"?"reps":"weight in kg"}`],
     [/^Supprimer la série (\d+)$/, (m,n)=>`Delete set ${n}`],
